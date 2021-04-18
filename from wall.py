@@ -126,7 +126,6 @@ def remove_symbols(text):
     return text
 
 def unpack(data, message = '', is_resend = False):
-    # message = ''
     # Дата
     data_date = data['date']
     message += (time.ctime(data_date) + '\n')
@@ -158,7 +157,6 @@ def unpack(data, message = '', is_resend = False):
         data_from = data['copy_history'][0]['from_id']
         message = 'Пересланное сообщение\n'
         unpack(data['copy_history'][0], message, True)
-    # return message
 
 count = 0
 data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : 'pushnoy_nadorad', 'count' : 1, 'offset' : 0}).json()['response']
@@ -166,14 +164,11 @@ offset = data['count'] - 1 - 5603
 pause = 120
 # while True:
 while count < 1:
-    # try:
     print(count)
     data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : 'pushnoy_nadorad', 'count' : 1, 'offset' : offset}).json()['response']
     data_count = data['count']
     # pprint(data)
-    # message = unpack(data['items'][0])
-#     # if data_count - count > 0:
-    # bot.send_message("@nadorad", message)
+    # if data_count - count > 0:
     unpack(data['items'][0])
 
     count += 1
@@ -184,10 +179,7 @@ while count < 1:
     if count % 10 == 0:
         pprint(data_count)
         print("offset", offset)
-        # pause += 15
         print("pause", pause)
         time.sleep(pause)
-    # except(telebot.apihelper.ApiTelegramException):
-    #     bot.send_message('627322534', '!!!')
-    #     time.sleep(60)
+
 # bot.polling()
