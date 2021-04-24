@@ -14,6 +14,7 @@ group_vk = 'pushnoy_nadorad'
 channel_tg = '@nadorad'
 
 def attachments(data_attachments, chat_id, message):
+    '''Processing messages with attachments'''
     attachment = {'photo' : [], 'posted_photo' : [], 'video' : [], 'doc' : [], 'gif' : [], 'graffiti' : [], 'note' : [], 'app' : [], 'poll' : [], 'album' : [], 'market' : [], 'market_album' : [], 'sticker' : [], 'pretty_cards' : []}
     for element in data_attachments:
         if element['type'] == 'photo':
@@ -42,7 +43,6 @@ def attachments(data_attachments, chat_id, message):
         elif element['type'] == 'link':
             if element['link']['url'] not in message:
                 message += ('\n\n' + element['link']['title'] + ': ' + element['link']['url'])
-                # message += ('\n\n' + element['link']['url'])
         elif element['type'] == 'note':
             title = element['note']['title']
             text = element['note']['text']
@@ -64,7 +64,6 @@ def attachments(data_attachments, chat_id, message):
         elif element['type'] == 'album':
             attachment['album'].append(element['album']['thumb']['sizes'][-1]['url'])
             attachment['album'].append(element['album']['title'])
-            # attachment['album'].append('')
         elif element['type'] == 'market':
             attachment['market'].append(element['market']['thumb_photo'])
             attachment['market'].append(element['market']['title'] + ' - ' + element['market']['price']['text'])
@@ -84,10 +83,11 @@ def attachments(data_attachments, chat_id, message):
                 message += '\nГде: ' + element['event']['address']
             if 'time' in element['event']:
                 message += '\nКогда: ' + time.ctime(element['event']['time'])
+    #Sending message
     if message:
         sending_message(chat_id, message)
+    #Sending attachments
     for element in attachment:
-        # pprint(element)
         try:
             if attachment[element]:
                 if element == 'photo' or element == 'posted_photo' or element == 'graffiti' or element == 'sticker' or element == 'doc':
@@ -111,6 +111,10 @@ def attachments(data_attachments, chat_id, message):
             print(attachment[element])
 
 def highest_photo(sizes):
+    '''
+    Choose a photo with the best quality
+    * sizes - array of photo sizes
+    '''
     photos = []
     for size in sizes.keys():
         if "photo_" in size:
@@ -120,6 +124,7 @@ def highest_photo(sizes):
     return photo
             
 def remove_symbols(text):
+    '''Removing characters from internal VK links'''
     while (('[club' in text) or ('[id' in text)) and ('|' in text) and (']' in text):
         symbols = []
         symbols.append(text.find('['))
@@ -132,6 +137,7 @@ def remove_symbols(text):
     return text
 
 def sending_message(chat_id, message):
+    '''Splitting a message, if necessary, and sending it'''
     if len(message) >= 4096:
         parts = []
         while len(message) >= 4096:
@@ -149,10 +155,11 @@ def sending_message(chat_id, message):
         bot.send_message(chat_id, message)
 
 def unpack(data, message = '', is_resend = False):
-    # Дата
+    '''Unpacking a post'''
+    # Date of sending
     data_date = data['date']
     message += (time.ctime(data_date) + '\n')
-    # Отправитель
+    # Sender
     data_from = data['from_id']
     if data_from != data['owner_id'] or is_resend:
         if data_from < 0:
@@ -160,14 +167,13 @@ def unpack(data, message = '', is_resend = False):
         else:
             data_from = requests.get('https://api.vk.com/method/users.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'user_ids' : data_from}).json()['response'][0]
             data_from = data_from['first_name'] + ' ' + data_from['last_name']
-        # pprint(data_from)
         message += 'От ' + data_from + ':\n\n'
-    # Текст
+    # Message text
     data_text = data['text']
     if data_text:
         data_text = remove_symbols(data_text)
         message += str(data_text)
-    # Вложения
+    # Attachments
     if 'attachments' in data:
         data_attachments = data['attachments']
         attachments(data_attachments, channel_tg, message)
@@ -175,7 +181,7 @@ def unpack(data, message = '', is_resend = False):
         if message:
             sending_message(channel_tg, message)
         # print("There is no attachments")
-    # Пересланное сообщение
+    # Forwarded message
     if 'copy_history' in data:
         data_from = data['copy_history'][0]['from_id']
         message = 'Пересланное сообщение\n'
@@ -183,30 +189,20 @@ def unpack(data, message = '', is_resend = False):
 
 count = 0
 data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : group_vk, 'count' : 1, 'offset' : 0}).json()['response']
-offset = data['count'] - 1 - 10267
+offset = data['count'] - 1
 pause = 120
 c = 0
-while True:
-# while count < 1:
+
+while offset >= 0:
     try:
         print(count)
         data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : group_vk, 'count' : 1, 'offset' : offset}).json()['response']
         data_count = data['count']
-        # pprint(data)
-        # if data_count - count > 0:
+        
         unpack(data['items'][0])
 
         count += 1
-        offset = data_count - 1 - count - 10267
-
-        # time.sleep(30)
-
-        # if count % 10 == 0:
-        #     pprint(data_count)
-        #     print("offset", offset)
-        #     print("pause", pause)
-        #     repeat = False
-        #     time.sleep(pause)
+        offset = data_count - 1 - count
             
     except(telebot.apihelper.ApiTelegramException):
         print('Exception')
@@ -216,4 +212,3 @@ while True:
         else:
             c = count
             time.sleep(pause)
-# bot.polling()
