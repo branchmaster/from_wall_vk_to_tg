@@ -4,12 +4,14 @@ from telebot.types import InputMediaPhoto, InputMediaDocument
 from pprint import pprint
 import time
 import tokens
-import traceback
 
 TOKEN_VK = tokens.TOKEN_VK
 TOKEN_TG = tokens.TOKEN_TG
 
 bot = telebot.TeleBot(TOKEN_TG)
+
+group_vk = 'pushnoy_nadorad'
+channel_tg = '@nadorad'
 
 def attachments(data_attachments, chat_id, message):
     attachment = {'photo' : [], 'posted_photo' : [], 'video' : [], 'doc' : [], 'gif' : [], 'graffiti' : [], 'note' : [], 'app' : [], 'poll' : [], 'album' : [], 'market' : [], 'market_album' : [], 'sticker' : [], 'pretty_cards' : []}
@@ -40,6 +42,7 @@ def attachments(data_attachments, chat_id, message):
         elif element['type'] == 'link':
             if element['link']['url'] not in message:
                 message += ('\n\n' + element['link']['title'] + ': ' + element['link']['url'])
+                # message += ('\n\n' + element['link']['url'])
         elif element['type'] == 'note':
             title = element['note']['title']
             text = element['note']['text']
@@ -56,12 +59,12 @@ def attachments(data_attachments, chat_id, message):
                 answers.append(answer['text'])
             attachment['poll'].append(answers)
             attachment['poll'].append(element['poll']['multiple'])
-            # print(attachment['poll'])
         elif element['type'] == 'page':
             message += ('\n\n' + element['page']['title'] + ': ' + element['page']['view_url'])
         elif element['type'] == 'album':
             attachment['album'].append(element['album']['thumb']['sizes'][-1]['url'])
             attachment['album'].append(element['album']['title'])
+            # attachment['album'].append('')
         elif element['type'] == 'market':
             attachment['market'].append(element['market']['thumb_photo'])
             attachment['market'].append(element['market']['title'] + ' - ' + element['market']['price']['text'])
@@ -82,38 +85,15 @@ def attachments(data_attachments, chat_id, message):
             if 'time' in element['event']:
                 message += '\nКогда: ' + time.ctime(element['event']['time'])
     if message:
-        if len(message) >= 4096:
-            parts = []
-            while len(message) >= 4096:
-                space = message.find(' ', 4000, 4096)
-                if space >= 0:
-                    parts.append(message[: space])
-                    message = message[space :]
-                else:
-                    parts.append(message[: 4096])
-                    message = message[4096 :]
-            parts.append(message)
-            for part in parts:
-                print(len(part))
-                bot.send_message(chat_id, part)
-        else:
-            bot.send_message(chat_id, message)
+        sending_message(chat_id, message)
     for element in attachment:
         # pprint(element)
         try:
             if attachment[element]:
                 if element == 'photo' or element == 'posted_photo' or element == 'graffiti' or element == 'sticker' or element == 'doc':
-                    # try:
-                    # attachment[element] = attachment[element][:8]
                     bot.send_media_group(chat_id, attachment[element])
-                    # except(telebot.apihelper.ApiTelegramException):
-                    #     bot.send_message(chat_id, '[Не удалось загрузить изображение]')
                 elif element == 'video' or element == 'app' or element == 'album' or element == 'market' or element == 'market_album' or element == 'pretty_cards':
-                    # try:
                     bot.send_photo(chat_id, attachment[element][0], attachment[element][1])
-                    # except(telebot.apihelper.ApiTelegramException):
-                    #     message = '[Не удалось загрузить превью]\n' + attachment[element][1]
-                    #     bot.send_message(chat_id, message)
                 # elif element == 'doc':
                 #     bot.send_document(chat_id, attachment[element])
                 elif element == 'gif':
@@ -126,6 +106,7 @@ def attachments(data_attachments, chat_id, message):
                         attachment[element][1].append('-')
                     bot.send_poll(chat_id, attachment[element][0], attachment[element][1], True, allows_multiple_answers=attachment[element][2])
         except(telebot.apihelper.ApiTelegramException):
+            # time.sleep(60)
             bot.send_message(chat_id, '[Не удалось загрузить]')
             print(attachment[element])
 
@@ -139,14 +120,33 @@ def highest_photo(sizes):
     return photo
             
 def remove_symbols(text):
-    while '[' in text and '|' in text and ']' in text:
+    while (('[club' in text) or ('[id' in text)) and ('|' in text) and (']' in text):
         symbols = []
         symbols.append(text.find('['))
-        symbols.append(text.find('|') + 1)
-        symbols.append(text.find(']'))
-        symbols.append(text.find(']') + 1)
+        if text[symbols[0] + 1 : symbols[0] + 5] != 'club' and text[symbols[0] + 1 : symbols[0] + 3] != 'id':
+            symbols[0] = text.find('[', symbols[0])
+        symbols.append(text.find('|', symbols[0]) + 1)
+        symbols.append(text.find(']', symbols[1]))
+        symbols.append(text.find(']', symbols[2]) + 1)
         text = text[: symbols[0]] + text[symbols[1] : symbols[2]] + text[symbols[3] :]
     return text
+
+def sending_message(chat_id, message):
+    if len(message) >= 4096:
+        parts = []
+        while len(message) >= 4096:
+            space = message.find(' ', 4000, 4096)
+            if space >= 0:
+                parts.append(message[: space])
+                message = message[space :]
+            else:
+                parts.append(message[: 4096])
+                message = message[4096 :]
+        parts.append(message)
+        for part in parts:
+            bot.send_message(chat_id, part)
+    else:
+        bot.send_message(chat_id, message)
 
 def unpack(data, message = '', is_resend = False):
     # Дата
@@ -170,10 +170,10 @@ def unpack(data, message = '', is_resend = False):
     # Вложения
     if 'attachments' in data:
         data_attachments = data['attachments']
-        attachments(data_attachments, "@nadorad", message)
+        attachments(data_attachments, channel_tg, message)
     else:
         if message:
-            bot.send_message("@nadorad", message)
+            sending_message(channel_tg, message)
         # print("There is no attachments")
     # Пересланное сообщение
     if 'copy_history' in data:
@@ -182,41 +182,38 @@ def unpack(data, message = '', is_resend = False):
         unpack(data['copy_history'][0], message, True)
 
 count = 0
-data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : 'pushnoy_nadorad', 'count' : 1, 'offset' : 0}).json()['response']
-offset = data['count'] - 1 - 9563
+data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : group_vk, 'count' : 1, 'offset' : 0}).json()['response']
+offset = data['count'] - 1 - 10267
 pause = 120
-repeat = False
-member = 0
-# while True:
-while count < 1:
-    # try:
-    print(count)
-    data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : 'pushnoy_nadorad', 'count' : 1, 'offset' : offset}).json()['response']
-    data_count = data['count']
-    # pprint(data)
-    # if data_count - count > 0:
-    unpack(data['items'][0])
+c = 0
+while True:
+# while count < 1:
+    try:
+        print(count)
+        data = requests.get('https://api.vk.com/method/wall.get/', params={'access_token' : TOKEN_VK, 'v' : '5.130', 'domain' : group_vk, 'count' : 1, 'offset' : offset}).json()['response']
+        data_count = data['count']
+        # pprint(data)
+        # if data_count - count > 0:
+        unpack(data['items'][0])
 
-    count += 1
-    offset = data_count - 1 - count - 9563
+        count += 1
+        offset = data_count - 1 - count - 10267
 
-    # time.sleep(30)
+        # time.sleep(30)
 
-    if count % 10 == 0:
-        pprint(data_count)
-        print("offset", offset)
-        print("pause", pause)
-        repeat = False
-        time.sleep(pause)
-    # except(telebot.apihelper.ApiTelegramException):
-    #     print('Exception')
-    #     if not repeat:
-    #         print(time.localtime())
-    #         repeat = True
-    #         member = count
-    #         time.sleep(60)
-    #     # elif repeat and member == count:
-    #     #     break
-    #     else:
-    #         break
+        # if count % 10 == 0:
+        #     pprint(data_count)
+        #     print("offset", offset)
+        #     print("pause", pause)
+        #     repeat = False
+        #     time.sleep(pause)
+            
+    except(telebot.apihelper.ApiTelegramException):
+        print('Exception')
+        if c == count:
+            print(time.localtime())
+            break
+        else:
+            c = count
+            time.sleep(pause)
 # bot.polling()
